@@ -4,12 +4,12 @@
 #   Juani -> caracteristicas temporales e irregularidad: tpr, shannon, sampen,
 #            media_rr, sdnn, rmssd, nrmssd (etapa 8)
 #   Pili  -> lomb_bandas() y psd_ar() (etapa 8, parte espectral)
-# TODO (Sofi, avance):
+# Hecho (Sofi, avance):
 #   [x] Comparar VENTANA_LATIDOS = 60 y 128: ventanas por clase y boxplots.
-# TODO (Juani, avance):
-#   [ ] Comparar medianas de nrmssd, tpr y shannon con Dash 2009
+# Hecho (Juani, avance):
+#   [x] Comparar medianas de nrmssd, tpr y shannon con Dash 2009
 #       (> 0,1; 0,54-0,77; > 0,7).
-# TODO (Pili, TP completo):
+# Hecho (Pili, TP completo):
 #   [x] Implementar psd_ar() (hecho). Comparacion con Lomb: python codigo/comparar_ar_lomb.py
 # =============================================================================
 # ETAPAS 7 y 8: ventanas y caracteristicas
@@ -236,6 +236,8 @@ if __name__ == "__main__":
 
     columnas = ["registro", "sujeto", "t_inicio_s", "etiqueta", "n_validos"] + NOMBRES
     comun.guardar_csv(filas, os.path.join(config.RES, "caracteristicas.csv"), columnas)
+    # el duplicado queda en el CSV pero no entra en la figura ni en las medianas
+    filas = [f for f in filas if f["registro"] not in config.REGISTROS_EXCLUIDOS]
     boxplots(filas)
 
     # Medianas por clase (para una primera mirada; la estadistica es la etapa 9)

@@ -1,6 +1,6 @@
 # =============================================================================
 # RESPONSABLE: Sofi
-# TODO (Sofi, avance):
+# Hecho (Sofi, avance):
 #   [x] Revisar tacograma_<reg>.png de varios registros.
 #   [x] Comparar cuantos intervalos marca como "ectopico" DENTRO de la FA con
 #       QUITAR_ECTOPICOS = True y False (config.py) y como cambian los boxplots.

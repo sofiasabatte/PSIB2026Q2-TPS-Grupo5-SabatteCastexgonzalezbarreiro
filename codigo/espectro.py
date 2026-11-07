@@ -1,9 +1,8 @@
 # =============================================================================
 # RESPONSABLE: Pili
-# TODO (Pili, avance):
-#   [ ] Correr en todos los registros y revisar espectro_resumen.csv: notch en
+# Hecho (Pili, avance):
+#   [x] Correr en todos los registros y revisar espectro_resumen.csv: notch en
 #       50 Hz (pico_50Hz_x < 1) y pozo en 75 Hz en todos.
-#   [ ] Escribir el parrafo de la etapa 2 para el informe.
 # =============================================================================
 # ETAPA 2: inspeccion espectral
 #
@@ -82,6 +81,14 @@ def analizar(reg):
         "pico_50Hz_x": round(pm[np.argmin(abs(f - 50))] / np.median(pm[(f > 45) & (f < 55)]), 2),
         "pico_60Hz_x": round(pm[np.argmin(abs(f - 60))] / np.median(pm[(f > 55) & (f < 62)]), 2),
     }
+    # Imagen especular: grabado a 125 Hz y remuestreado a 200 Hz, lo que hay por
+    # encima de 62,5 Hz es el espejo de lo que hay por debajo (f -> 125 - f).
+    # pozo_75Hz_x < 1: hay un pozo en 75 Hz (espejo del notch de 50 Hz).
+    # corr_espejo alta: el espectro de 62,5 a 100 Hz copia el de 25 a 62,5 Hz.
+    m = (f > 62.5) & (f < 100)
+    espejo = np.interp(125 - f[m], f, pm)
+    fila["pozo_75Hz_x"] = round(pm[np.argmin(abs(f - 75))] / np.median(pm[(f > 70) & (f < 80)]), 2)
+    fila["corr_espejo"] = round(np.corrcoef(np.log(pm[m]), np.log(espejo))[0, 1], 3)
     print(fila)
     return fila
 

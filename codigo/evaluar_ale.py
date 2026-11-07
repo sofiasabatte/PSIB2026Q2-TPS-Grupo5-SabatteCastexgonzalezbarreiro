@@ -17,6 +17,11 @@
 #
 # Entra:  resultados/calidad/<reg>.csv (etapa 3)
 # Sale:   resultados/evaluacion_ale.csv  (una fila por ventana y parametros)
+#         El script siempre escribe evaluacion_ale.csv; las dos corridas del informe
+#         se guardaron con otro nombre, cada una con las 128 combinaciones
+#         (4 delta x 4 L x 8 mu):
+#           evaluacion_ale_prueba1.csv       = tanda exploratoria: 021, 077, 113, 131, 137
+#           evaluacion_ale_confirmacion.csv  = tanda de confirmacion: 033, 050, 064, 084, 112
 #
 # Como correrlo (desde la carpeta principal del repo):
 #   python codigo/evaluar_ale.py                 # 131, 113, 021, 077, 137; 12 ventanas c/u

@@ -6,7 +6,7 @@
 # no sirven para comparar FA contra no-FA.
 #
 # Entra:  resultados/AdditionalData.csv   (128 registros)
-# Sale:   resultados/registros_anotados.csv  (98 registros; 97 sujetos distintos: 005 y 020 son duplicados, ver REGISTROS_EXCLUIDOS en config.py)
+# Sale:   resultados/registros_anotados.csv  (98 registros; 97 registros sin el duplicado 020 (005 y 020 son duplicados), de 93 sujetos distintos, ver REGISTROS_EXCLUIDOS en config.py)
 #
 # Como correrlo (desde la carpeta principal del repo):
 #   python codigo/seleccion.py

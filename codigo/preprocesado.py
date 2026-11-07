@@ -1,11 +1,10 @@
 # =============================================================================
 # RESPONSABLE: Pili
-# TODO (Pili, avance):
-#   [ ] Revisar figuras ruido_<reg>.png de varios registros. Si marca ventanas
+# Hecho (Pili, avance):
+#   [x] Revisar figuras ruido_<reg>.png de varios registros. Si marca ventanas
 #       limpias como ruidosas (o al reves), ajustar UMBRAL_BSQI / UMBRAL_KSQI
 #       en config.py y documentar el criterio.
-#   [ ] Escribir el parrafo de la etapa 3 para el informe.
-# TODO (Pili, TP completo):
+# Hecho (Pili, TP completo):
 #   [x] Etapa 4: ale_nlms() implementada.
 #   [x] Etapa 4: evaluar_ale.py corrido (128 combinaciones); decision: no se integra.
 # =============================================================================

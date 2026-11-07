@@ -25,12 +25,6 @@ import config
 # Lectura
 # ---------------------------------------------------------------------------
 
-def leer_tramo(reg, a, b):
-    """Devuelve las muestras [a, b) del canal elegido, en mV."""
-    a, b = max(int(a), 0), min(int(b), largo_registro(reg))   # <-- esta línea nueva
-    nombre, pn = _ruta(reg)
-    ...
-    
 def todos_los_registros():
     """Los registros anotados de la etapa 0, sin los que tienen marcapasos
     durante el Holter (ritmo marcapaseado = regular aunque haya FA)."""

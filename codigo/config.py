@@ -48,7 +48,7 @@ UMBRAL_KSQI = 5              # curtosis del ECG; ECG limpio > 5 (Li et al. 2008)
 # Criterio que decide si una ventana de 10 s es ruidosa.
 #   "bsqi"      -> solo bSQI < UMBRAL_BSQI (criterio del paper de la base SHDB-AF)
 #   "bsqi_ksqi" -> bSQI o kSQI (criterio anterior, queda para comparar)
-# Se eligió "bsqi" porque en la auditoría (auditar_criterio_ruido.py) las ventanas
+# Se eligió "bsqi" porque en la auditoría (ver resumen_calidad.py) las ventanas
 # marcadas solo por kSQI se detectan igual de bien que las limpias: eran ondas T altas,
 # no ruido.
 CRITERIO_RUIDO = "bsqi"
