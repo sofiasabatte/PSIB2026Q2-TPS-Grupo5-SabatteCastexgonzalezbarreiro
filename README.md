@@ -8,7 +8,7 @@ TP de Procesamiento de Señales e Imágenes Biomédicas (ITBA), Grupo 5.
 
 La fibrilación auricular (FA) hace que el ritmo del corazón sea irregular. Este trabajo la detecta **mirando solo el ritmo**: calcula 10 medidas sobre los tiempos entre latidos (RR) en ventanas de 60 latidos y mide qué tan bien separa cada una la FA del ritmo normal. No usa machine learning.
 
-Datos: base SHDB-AF de PhysioNet (Tsutsui et al., 2025), 128 Holters de 24 h, de los cuales 98 tienen el ritmo anotado (97 sujetos distintos: el 005 y el 020 son el mismo archivo y se excluye el 020).
+Datos: base SHDB-AF de PhysioNet (Tsutsui et al., 2025), 128 Holters de 24 h, de los cuales 98 tienen el ritmo anotado, de 93 sujetos distintos (el 005 y el 020 son el mismo archivo y se excluye el 020).
 
 ## Cómo prepararlo
 
@@ -30,7 +30,7 @@ Todos los parámetros están en `codigo/config.py` (filtro, umbrales de ruido, l
 | 2 a 6 | Espectro, filtrado y ruido, detección de latidos y serie RR, registro por registro | `python codigo/correr_todo.py todos` |
 | 7 y 8 | Ventanas de 60 latidos y 10 características | `python codigo/caracteristicas.py` |
 | 9 | Estadística: AUC por sujeto, Wilcoxon, Mann-Whitney, Holm | `python codigo/estadistica.py` |
-| 9 | Umbral y curva ROC | `python codigo/roc_umbral.py` |
+| 9 | Curva ROC, umbral (Youden) en train y F1 en test, por ventana | `python codigo/roc_umbral.py` |
 
 `correr_todo.py` ejecuta, para cada registro y en este orden, `espectro.py`, `preprocesado.py`, `deteccion_qrs.py` y `serie_rr.py`. Corre varios registros en paralelo y tarda unos 25 a 50 minutos para los 98. También se puede correr un registro: `python codigo/correr_todo.py 112`.
 
@@ -51,6 +51,7 @@ Todos los parámetros están en `codigo/config.py` (filtro, umbrales de ruido, l
 - 162.797 ventanas de 60 latidos: 39.530 con FA y 123.267 sin FA.
 - AUC por sujeto: TPR 0,911, SampEn 0,892, Shannon 0,884, nRMSSD 0,883, HF 0,863. El LF solo no separa (0,49).
 - Las conclusiones no cambian con el criterio de ruido ni con el método de espectro.
+- Detección por ventana (umbral elegido en train, evaluado en test, partición por sujeto 70/30): mejor característica sola nRMSSD (F1 0,80 en la partición 0; 0,70 ± 0,09 en 10 particiones). La regla combinada de Dash et al. 2009, con sus umbrales publicados, da F1 0,79 ± 0,07 en 10 particiones (rango 0,67 a 0,90).
 - Falsos positivos concentrados en pocos registros (033 y 136: ectópicos con patrón repetido; 051: anotación dudosa).
 
 ## Scripts de apoyo
@@ -68,7 +69,7 @@ Todos los parámetros están en `codigo/config.py` (filtro, umbrales de ruido, l
 
 Se guarda en `resultados/`:
 
-- `registros_anotados.csv`, `validacion_qrs.csv`, `caracteristicas.csv`, `estadistica.csv`, `roc_umbral.csv` y los CSV de comparación.
+- `registros_anotados.csv`, `validacion_qrs.csv`, `caracteristicas.csv`, `estadistica.csv`, `roc_umbral.csv`, `roc_umbral_estabilidad.csv` y los CSV de comparación.
 - `figuras/`: espectros, filtrado, ruido, detección de QRS, tacogramas, diagramas de caja y curva ROC.
 - Las carpetas `calidad/`, `rpicos/`, `rr/` y `logs/` son intermedias y no se suben a git.
 
@@ -87,6 +88,7 @@ Se guarda en `resultados/`:
 - Widrow et al., 1975. Cancelación adaptativa de ruido.
 - Kligfield et al., 2007. Recomendaciones de la AHA para el ECG.
 - Li et al., 2008. Índices de calidad de señal de ECG.
+- de Chazal et al., 2004. Partición de los datos por sujeto (train/test sin repetir pacientes).
 
 ## Integrantes
 
