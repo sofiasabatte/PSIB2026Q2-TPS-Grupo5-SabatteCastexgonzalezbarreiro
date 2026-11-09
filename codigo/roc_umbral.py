@@ -13,7 +13,7 @@
 #      umbrales publicados (no se ajusta nada): FA si
 #      nrmssd > 0,1  Y  0,54 <= tpr <= 0,77  Y  shannon > 0,7.
 #   5. Estabilidad: repite 1-4 con N_PARTICIONES particiones distintas y
-#      reporta media, desvio, minimo y maximo del F1 en test. Con ~97 sujetos
+#      reporta media, desvio, minimo y maximo del F1 en test. Con 93 sujetos
 #      el resultado de UNA particion depende mucho de que sujetos caen en test.
 #
 # FA = clase positiva. F1 = 2 * VPP * Se / (VPP + Se).

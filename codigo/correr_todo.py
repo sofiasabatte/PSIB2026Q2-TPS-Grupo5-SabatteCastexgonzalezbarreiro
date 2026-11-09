@@ -1,8 +1,8 @@
 # =============================================================================
 # RESPONSABLE: Juani
-# TODO (Juani, avance):
-#   [ ] Correr con los 98 registros y revisar resultados/logs/ si alguno falla.
-#   [ ] Subir al repo los CSV resumen y las figuras que vayan al informe.
+# Hecho (Juani, avance):
+#   [x] Correr con los 98 registros y revisar resultados/logs/ si alguno falla.
+#   [x] Subir al repo los CSV resumen y las figuras que vayan al informe.
 # =============================================================================
 # Corre las etapas 2 a 8 para los registros elegidos.
 #

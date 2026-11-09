@@ -1,9 +1,8 @@
 # =============================================================================
 # RESPONSABLE: Juani
-# TODO (Juani, avance):
-#   [ ] Revisar validacion_qrs.csv de los 98 registros; mirar qrs_<reg>.png de
+# Hecho (Juani, avance):
+#   [x] Revisar validacion_qrs.csv de los 98 registros; mirar qrs_<reg>.png de
 #       los que tengan Se o VPP mas bajas.
-#   [ ] Escribir el parrafo de la etapa 5 para el informe.
 # =============================================================================
 # ETAPA 5: deteccion de QRS (Pan-Tompkins) y validacion
 #

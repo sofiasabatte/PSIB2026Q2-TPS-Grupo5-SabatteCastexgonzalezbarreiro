@@ -1,11 +1,11 @@
 """Dibuja 10 s de un registro con las marcas de pan_tompkins, en una zona donde
-hay marcas de los dos lados (si las hay). Abre un PNG por registro.
+hay marcas de los dos lados (si las hay). Guarda un PNG por registro en la
+carpeta temporal del sistema e imprime la ruta.
 
 Correr desde la raiz del repo:
     python codigo/ver_polaridad.py 021 141 033
 """
 import os
-import subprocess
 import sys
 import tempfile
 
@@ -54,4 +54,3 @@ for reg in sys.argv[1:]:
     fig.savefig(ruta, dpi=150)
     plt.close(fig)
     print(f"{reg}: figura en {ruta}")
-    subprocess.run(["open", ruta])
