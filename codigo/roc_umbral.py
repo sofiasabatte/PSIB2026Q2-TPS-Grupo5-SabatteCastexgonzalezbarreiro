@@ -13,8 +13,13 @@
 #      umbrales publicados (no se ajusta nada): FA si
 #      nrmssd > 0,1  Y  0,54 <= tpr <= 0,77  Y  shannon > 0,7.
 #   5. Estabilidad: repite 1-4 con N_PARTICIONES particiones distintas y
-#      reporta media, desvio, minimo y maximo del F1 en test. Con 93 sujetos
-#      el resultado de UNA particion depende mucho de que sujetos caen en test.
+#      reporta media, desvio, minimo y maximo del F1 en test, y media y desvio
+#      de Se y Esp. Con 93 sujetos el resultado de UNA particion depende mucho
+#      de que sujetos caen en test. El F1 depende ademas de cuanta FA cae en
+#      test (prevalencia); Se y Esp no, por eso se informan aparte.
+#   6. Falsos positivos por registro: en cada particion, las ventanas no-FA del
+#      test que la regla de Dash marca como FA, sumadas por registro. Sirve para
+#      ver si los errores se reparten o se concentran en pocos registros.
 #
 # FA = clase positiva. F1 = 2 * VPP * Se / (VPP + Se).
 #
@@ -29,6 +34,8 @@
 # Sale:   resultados/roc_umbral.csv            (particion SEMILLA)
 #         resultados/roc_umbral_estabilidad.csv (N_PARTICIONES particiones)
 #         resultados/figuras/roc.png
+#         resultados/figuras/roc_estabilidad.png   (F1 en test, una caja por caracteristica)
+#         resultados/roc_falsos_positivos.csv      (regla de Dash, por registro)
 #
 # Como correrlo:
 #   python codigo/roc_umbral.py
@@ -104,6 +111,18 @@ def regla_dash(filas):
     return (nr > 0.1) & (tp >= 0.54) & (tp <= 0.77) & (sh > 0.7), y
 
 
+def falsos_positivos_dash(test, acum):
+    """Suma en acum[registro] las ventanas no-FA del test y cuantas de ellas
+    la regla de Dash marca como FA."""
+    pred, y = regla_dash(test)
+    for f, p, es_fa in zip(test, pred, y):
+        if es_fa:
+            continue
+        d = acum.setdefault(f["registro"], {"sujeto": f["sujeto"], "noFA": 0, "FP": 0, "particiones": set()})
+        d["noFA"] += 1
+        d["FP"] += int(p)
+
+
 def evaluar(train, test):
     """Umbral de Youden en train, metricas en test, para cada caracteristica
     y para la regla de Dash. Devuelve (filas de resultados, curvas ROC)."""
@@ -156,6 +175,7 @@ if __name__ == "__main__":
     fig.tight_layout()
     os.makedirs(config.FIG, exist_ok=True)
     fig.savefig(os.path.join(config.FIG, "roc.png"), dpi=150)
+    plt.close(fig)
 
     print(f"\nParticion {SEMILLA} (Se, Esp, VPP y F1 en TEST; AUC en TRAIN)")
     print(f"{'caracteristica':18s}{'AUC':>7s}{'umbral':>9s}{'Se':>7s}{'Esp':>7s}{'VPP':>7s}{'F1':>7s}")
@@ -166,21 +186,74 @@ if __name__ == "__main__":
               f"{s['VPP']:7.3f}{s['F1']:7.3f}")
 
     # --- 2. estabilidad: N_PARTICIONES particiones ---------------------------
-    f1s = {}
+    por_metrica = {"F1": {}, "Se": {}, "Esp": {}}
+    fp_reg = {}
     for semilla in range(N_PARTICIONES):
-        res, _ = evaluar(*particion_por_sujeto(filas, semilla=semilla))
+        train_s, test_s = particion_por_sujeto(filas, semilla=semilla)
+        res, _ = evaluar(train_s, test_s)
+        falsos_positivos_dash(test_s, fp_reg)
+        for f in test_s:
+            if f["registro"] in fp_reg:
+                fp_reg[f["registro"]]["particiones"].add(semilla)
         for s in res:
-            f1s.setdefault(s["caracteristica"], []).append(s["F1"])
-    estab = [{"caracteristica": k, "F1_media": round(np.mean(v), 4),
-              "F1_desvio": round(np.std(v, ddof=1), 4),
-              "F1_min": round(np.min(v), 4), "F1_max": round(np.max(v), 4)}
-             for k, v in f1s.items()]
+            for m, d in por_metrica.items():
+                d.setdefault(s["caracteristica"], []).append(s[m])
+    f1s = por_metrica["F1"]
+    estab = []
+    for k, v in f1s.items():
+        se, esp = por_metrica["Se"][k], por_metrica["Esp"][k]
+        estab.append({"caracteristica": k, "F1_media": round(np.mean(v), 4),
+                      "F1_desvio": round(np.std(v, ddof=1), 4),
+                      "F1_min": round(np.min(v), 4), "F1_max": round(np.max(v), 4),
+                      "Se_media": round(np.mean(se), 4), "Se_desvio": round(np.std(se, ddof=1), 4),
+                      "Esp_media": round(np.mean(esp), 4), "Esp_desvio": round(np.std(esp, ddof=1), 4)})
     estab.sort(key=lambda e: -e["F1_media"])
     comun.guardar_csv(estab, os.path.join(config.RES, "roc_umbral_estabilidad.csv"),
                       list(estab[0].keys()))
 
-    print(f"\nF1 en test sobre {N_PARTICIONES} particiones por sujeto")
-    print(f"{'caracteristica':18s}{'media':>8s}{'desvio':>8s}{'min':>7s}{'max':>7s}")
+    print(f"\nTest sobre {N_PARTICIONES} particiones por sujeto (media +- desvio)")
+    print(f"{'caracteristica':18s}{'F1':>14s}{'Se':>14s}{'Esp':>14s}")
     for e in estab:
-        print(f"{e['caracteristica']:18s}{e['F1_media']:8.3f}{e['F1_desvio']:8.3f}"
-              f"{e['F1_min']:7.3f}{e['F1_max']:7.3f}")
+        print(f"{e['caracteristica']:18s}"
+              f"{e['F1_media']:8.3f} +-{e['F1_desvio']:.3f}"
+              f"{e['Se_media']:8.3f} +-{e['Se_desvio']:.3f}"
+              f"{e['Esp_media']:8.3f} +-{e['Esp_desvio']:.3f}")
+
+    # Figura: una caja por caracteristica con el F1 de las N particiones,
+    # ordenadas por mediana. La regla de Dash en otro color.
+    orden = sorted(f1s, key=lambda k: np.median(f1s[k]))
+    fig, ax = plt.subplots(figsize=(8, 5))
+    cajas = ax.boxplot([f1s[k] for k in orden], orientation="horizontal", patch_artist=True,
+                       tick_labels=orden, medianprops={"color": "k"})
+    for k, caja in zip(orden, cajas["boxes"]):
+        caja.set_facecolor("C3" if k == REGLA_DASH else "C0")
+        caja.set_alpha(0.6)
+    for i, k in enumerate(orden, start=1):
+        ax.plot(f1s[k], np.full(len(f1s[k]), i), "k.", ms=3)
+    ax.set_xlabel("F1 en test")
+    ax.set_title(f"F1 en test en {N_PARTICIONES} particiones por sujeto")
+    ax.grid(axis="x", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(config.FIG, "roc_estabilidad.png"), dpi=150)
+    plt.close(fig)
+
+    # --- 3. falsos positivos de la regla de Dash por registro ---------------
+    # Cada registro cae en test en algunas particiones; se suman todas.
+    total_fp = sum(d["FP"] for d in fp_reg.values())
+    fp_filas = [{"registro": r, "sujeto": d["sujeto"],
+                 "particiones_en_test": len(d["particiones"]),
+                 "ventanas_noFA_test": d["noFA"], "FP": d["FP"],
+                 "FP_%_del_registro": round(100 * d["FP"] / d["noFA"], 2),
+                 "FP_%_del_total": round(100 * d["FP"] / total_fp, 2) if total_fp else 0.0}
+                for r, d in fp_reg.items()]
+    fp_filas.sort(key=lambda d: -d["FP"])
+    comun.guardar_csv(fp_filas, os.path.join(config.RES, "roc_falsos_positivos.csv"),
+                      list(fp_filas[0].keys()))
+
+    acum = np.cumsum([d["FP"] for d in fp_filas]) / total_fp if total_fp else []
+    n80 = int(np.searchsorted(acum, 0.8) + 1) if total_fp else 0
+    print(f"\nFalsos positivos de la regla de Dash en test ({N_PARTICIONES} particiones): {total_fp}")
+    print(f"El 80% de los FP sale de {n80} de {len(fp_filas)} registros.")
+    print(f"{'registro':>9s}{'FP':>8s}{'% del reg':>11s}{'% del total':>13s}")
+    for d in fp_filas[:10]:
+        print(f"{d['registro']:>9s}{d['FP']:8d}{d['FP_%_del_registro']:11.2f}{d['FP_%_del_total']:13.2f}")
