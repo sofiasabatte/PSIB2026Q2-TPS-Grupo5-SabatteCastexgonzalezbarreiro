@@ -17,6 +17,10 @@
 #      de Se y Esp. Con 93 sujetos el resultado de UNA particion depende mucho
 #      de que sujetos caen en test. El F1 depende ademas de cuanta FA cae en
 #      test (prevalencia); Se y Esp no, por eso se informan aparte.
+#   5b. Regla de Dash AJUSTADA a 60 latidos: misma forma de la regla, pero los
+#      4 umbrales (nrmssd, shannon, tpr minimo y maximo) se eligen en TRAIN por
+#      busqueda en grilla maximizando el indice de Youden, y se evaluan en TEST.
+#      Responde a que los umbrales publicados son para ventanas de 128 latidos.
 #   6. Falsos positivos por registro: en cada particion, las ventanas no-FA del
 #      test que la regla de Dash marca como FA, sumadas por registro. Sirve para
 #      ver si los errores se reparten o se concentran en pocos registros.
@@ -36,6 +40,7 @@
 #         resultados/figuras/roc.png
 #         resultados/figuras/roc_estabilidad.png   (F1 en test, una caja por caracteristica)
 #         resultados/roc_falsos_positivos.csv      (regla de Dash, por registro)
+#         resultados/roc_dash_ajustada.csv         (umbrales elegidos en cada particion)
 #
 # Como correrlo:
 #   python codigo/roc_umbral.py
@@ -57,6 +62,15 @@ FRACCION_TEST = 0.3
 SEMILLA = 0            # fija, para que la particion sea reproducible
 N_PARTICIONES = 10
 REGLA_DASH = "regla Dash 2009"
+REGLA_DASH_AJ = "regla Dash ajustada"
+# Grilla para ajustar la regla de Dash en train (incluye los valores publicados).
+# TPR maximo = 1,0 equivale a no poner limite superior.
+GRILLA_DASH = {
+    "nrmssd": np.round(np.arange(0.05, 0.205, 0.01), 3),
+    "shannon": np.round(np.arange(0.60, 0.905, 0.02), 3),
+    "tpr_min": np.round(np.arange(0.36, 0.605, 0.02), 3),
+    "tpr_max": np.array([0.70, 0.77, 0.85, 1.0]),
+}
 
 
 def particion_por_sujeto(filas, fraccion_test=FRACCION_TEST, semilla=SEMILLA):
@@ -123,6 +137,45 @@ def falsos_positivos_dash(test, acum):
         d["FP"] += int(p)
 
 
+def _arrays_dash(filas):
+    nr = np.array([float(f["nrmssd"]) for f in filas])
+    tp = np.array([float(f["tpr"]) for f in filas])
+    sh = np.array([float(f["shannon"]) for f in filas])
+    y = np.array([f["etiqueta"] == "FA" for f in filas])
+    return nr, tp, sh, y
+
+
+def ajustar_dash(train):
+    """Umbrales de la regla de Dash que maximizan Youden en train.
+    Devuelve (nrmssd, shannon, tpr_min, tpr_max)."""
+    nr, tp, sh, y = _arrays_dash(train)
+    mejor_j, mejor = -1.0, None
+    for a in GRILLA_DASH["nrmssd"]:
+        ma = nr > a
+        for b in GRILLA_DASH["shannon"]:
+            mb = ma & (sh > b)
+            for c in GRILLA_DASH["tpr_min"]:
+                mc = mb & (tp >= c)
+                for d in GRILLA_DASH["tpr_max"]:
+                    p = mc & (tp <= d)
+                    j = p[y].mean() + (~p[~y]).mean() - 1
+                    if j > mejor_j:
+                        mejor_j, mejor = j, (float(a), float(b), float(c), float(d))
+    return mejor
+
+
+def aplicar_dash(filas, umbrales):
+    a, b, c, d = umbrales
+    nr, tp, sh, y = _arrays_dash(filas)
+    return (nr > a) & (sh > b) & (tp >= c) & (tp <= d), y
+
+
+def texto_dash(umbrales):
+    a, b, c, d = umbrales
+    tmax = "" if d >= 1 else f" y <={d:g}"
+    return f"nrmssd>{a:g}, shannon>{b:g}, tpr>={c:g}{tmax}"
+
+
 def evaluar(train, test):
     """Umbral de Youden en train, metricas en test, para cada caracteristica
     y para la regla de Dash. Devuelve (filas de resultados, curvas ROC)."""
@@ -145,6 +198,11 @@ def evaluar(train, test):
     salida.append({"caracteristica": REGLA_DASH, "AUC_train": np.nan,
                    "umbral": np.nan, "FA_si": "fijo (publicado)",
                    **metricas(pred, y)})
+    umb = ajustar_dash(train)
+    pred, y = aplicar_dash(test, umb)
+    salida.append({"caracteristica": REGLA_DASH_AJ, "AUC_train": np.nan,
+                   "umbral": np.nan, "FA_si": texto_dash(umb),
+                   **metricas(pred, y), "_umbrales": umb})
     return salida, curvas
 
 
@@ -159,11 +217,14 @@ if __name__ == "__main__":
     # --- 1. particion fija (SEMILLA) -----------------------------------------
     salida, curvas = evaluar(train, test)
     redondear = lambda v: round(float(v), 4) if isinstance(v, (float, np.floating)) else v
-    comun.guardar_csv([{k: redondear(v) for k, v in s.items()} for s in salida],
+    comun.guardar_csv([{k: redondear(v) for k, v in s.items() if not k.startswith("_")}
+                       for s in salida],
                       os.path.join(config.RES, "roc_umbral.csv"), list(salida[0].keys()))
 
     fig, ax = plt.subplots(figsize=(6, 6))
-    for s in salida[:-1]:
+    for s in salida:
+        if s["caracteristica"] not in curvas:
+            continue
         fpr, tpr = curvas[s["caracteristica"]]
         ax.plot(fpr, tpr, lw=1, label=f"{s['caracteristica']} (AUC {s['AUC_train']:.2f})")
     ax.plot([0, 1], [0, 1], "k--", lw=0.8)
@@ -180,7 +241,8 @@ if __name__ == "__main__":
     print(f"\nParticion {SEMILLA} (Se, Esp, VPP y F1 en TEST; AUC en TRAIN)")
     print(f"{'caracteristica':18s}{'AUC':>7s}{'umbral':>9s}{'Se':>7s}{'Esp':>7s}{'VPP':>7s}{'F1':>7s}")
     for s in sorted(salida, key=lambda s: -s["F1"]):
-        u = "fijo" if s["caracteristica"] == REGLA_DASH else f"{s['FA_si']}{s['umbral']:.3g}"
+        u = ("fijo" if s["caracteristica"] == REGLA_DASH else
+             "ajust." if s["caracteristica"] == REGLA_DASH_AJ else f"{s['FA_si']}{s['umbral']:.3g}")
         a = "" if np.isnan(s["AUC_train"]) else f"{s['AUC_train']:.3f}"
         print(f"{s['caracteristica']:18s}{a:>7s}{u:>9s}{s['Se']:7.3f}{s['Esp']:7.3f}"
               f"{s['VPP']:7.3f}{s['F1']:7.3f}")
@@ -188,6 +250,7 @@ if __name__ == "__main__":
     # --- 2. estabilidad: N_PARTICIONES particiones ---------------------------
     por_metrica = {"F1": {}, "Se": {}, "Esp": {}}
     fp_reg = {}
+    umbrales_aj = []
     for semilla in range(N_PARTICIONES):
         train_s, test_s = particion_por_sujeto(filas, semilla=semilla)
         res, _ = evaluar(train_s, test_s)
@@ -196,6 +259,13 @@ if __name__ == "__main__":
             if f["registro"] in fp_reg:
                 fp_reg[f["registro"]]["particiones"].add(semilla)
         for s in res:
+            if s["caracteristica"] == REGLA_DASH_AJ:
+                a, b, c, d_ = s["_umbrales"]
+                umbrales_aj.append({"particion": semilla, "nrmssd_mayor_a": a,
+                                    "shannon_mayor_a": b, "tpr_min": c,
+                                    "tpr_max": d_ if d_ < 1 else "sin limite",
+                                    "F1_test": round(s["F1"], 4), "Se_test": round(s["Se"], 4),
+                                    "Esp_test": round(s["Esp"], 4)})
             for m, d in por_metrica.items():
                 d.setdefault(s["caracteristica"], []).append(s[m])
     f1s = por_metrica["F1"]
@@ -219,6 +289,13 @@ if __name__ == "__main__":
               f"{e['Se_media']:8.3f} +-{e['Se_desvio']:.3f}"
               f"{e['Esp_media']:8.3f} +-{e['Esp_desvio']:.3f}")
 
+    comun.guardar_csv(umbrales_aj, os.path.join(config.RES, "roc_dash_ajustada.csv"),
+                      list(umbrales_aj[0].keys()))
+    print(f"\nRegla de Dash ajustada en train (umbrales por particion):")
+    for u in umbrales_aj:
+        print(f"  {u['particion']}: nrmssd>{u['nrmssd_mayor_a']:g} shannon>{u['shannon_mayor_a']:g} "
+              f"tpr>={u['tpr_min']:g} tpr<={u['tpr_max']}  F1 test {u['F1_test']:.3f}")
+
     # Figura: una caja por caracteristica con el F1 de las N particiones,
     # ordenadas por mediana. La regla de Dash en otro color.
     orden = sorted(f1s, key=lambda k: np.median(f1s[k]))
@@ -226,7 +303,7 @@ if __name__ == "__main__":
     cajas = ax.boxplot([f1s[k] for k in orden], orientation="horizontal", patch_artist=True,
                        tick_labels=orden, medianprops={"color": "k"})
     for k, caja in zip(orden, cajas["boxes"]):
-        caja.set_facecolor("C3" if k == REGLA_DASH else "C0")
+        caja.set_facecolor({REGLA_DASH: "C3", REGLA_DASH_AJ: "C1"}.get(k, "C0"))
         caja.set_alpha(0.6)
     for i, k in enumerate(orden, start=1):
         ax.plot(f1s[k], np.full(len(f1s[k]), i), "k.", ms=3)
